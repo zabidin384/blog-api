@@ -12,6 +12,8 @@ import { clerkMiddleware } from "@clerk/express";
 import cors from "cors";
 
 const app = express();
+connectDB();
+
 app.use(cors(process.env.CLIENT_URL));
 app.use(clerkMiddleware());
 app.use("/webhooks", webhookRouter);
@@ -39,6 +41,5 @@ app.use((error, req, res, next) => {
 });
 
 app.listen(5000, () => {
-	connectDB();
 	console.log("Server is running on port 5000.");
 });
