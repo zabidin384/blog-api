@@ -38,7 +38,7 @@ export const deleteComment = async (req, res) => {
 	// User
 	const user = userModel.findOne({ clerkUserId });
 	const deletedComment = await commentModel.findOneAndDelete({ _id: id, user: user._id });
-	if (!deleteComment) return res.status(403).json("You can only delete your comment!");
+	if (!deletedComment) return res.status(403).json("You can only delete your comment!");
 
 	res.status(200).json("Comment has been deleted successfully!");
 };
