@@ -1,6 +1,7 @@
 import ImageKit from "imagekit";
 import postModel from "../models/post.model.js";
 import userModel from "../models/user.model.js";
+import mongoose from "mongoose";
 
 export const getPosts = async (req, res) => {
 	const page = parseInt(req.query.page) || 1;
@@ -135,4 +136,53 @@ const imagekit = new ImageKit({
 export const uploadAuth = async (req, res) => {
 	const { token, expire, signature } = imagekit.getAuthenticationParameters();
 	res.send({ token, expire, signature, publicKey: process.env.IMAGEKIT_PUBLIC_KEY });
+};
+
+export const getSuggestions = async (req, res) => {
+	const { category, currentPostId } = req.query;
+
+	if (!mongoose.Types.ObjectId.isValid(currentPostId)) {
+		return res.status(400).json({ message: "Invalid post id" });
+	}
+
+	try {
+		let suggestedPosts = await postModel.aggregate([
+			{ $match: { category: category, _id: { $ne: new mongoose.Types.ObjectId(currentPostId) } } },
+			{ $sample: { size: 4 } },
+			{
+				$lookup: {
+					from: "users",
+					localField: "user",
+					foreignField: "_id",
+					as: "user",
+				},
+			},
+			{ $unwind: "$user" },
+		]);
+
+		if (suggestedPosts.length < 4) {
+			const excludedIds = suggestedPosts.map((p) => p._id);
+			excludedIds.push(new mongoose.Types.ObjectId(currentPostId));
+
+			const additionalPosts = await postModel.aggregate([
+				{ $match: { _id: { $not: { $in: excludedIds } } } },
+				{ $sample: { size: 4 - suggestedPosts.length } },
+				{
+					$lookup: {
+						from: "users",
+						localField: "user",
+						foreignField: "_id",
+						as: "user",
+					},
+				},
+				{ $unwind: "$user" },
+			]);
+
+			suggestedPosts = [...suggestedPosts, ...additionalPosts];
+		}
+
+		res.status(200).json(suggestedPosts);
+	} catch (err) {
+		res.status(500).json(err);
+	}
 };
